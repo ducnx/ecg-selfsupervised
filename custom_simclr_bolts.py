@@ -31,7 +31,8 @@ import os
 from clinical_ts.simclr_dataset_wrapper import SimCLRDataSetWrapper
 from clinical_ts.create_logger import create_logger
 import pickle
-from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning import Trainer
+from pytorch_lightning.utilities.seed import seed_everything
 
 from torch import nn
 from torch.nn import functional as F
@@ -254,14 +255,23 @@ class CustomSimCLR(pl.LightningModule):
         # result = pl.TrainResult(minimize=loss)
         # result.log('train/train_loss', loss, on_epoch=True)
 
-        acc = _accuracy(z1, z2, z1.shape[0])
+        acc = torch.tensor(_accuracy(z1, z2, z1.shape[0]))
         # result.log('train/train_acc', acc, on_epoch=True)
         result = {
-            "train/train_loss": loss, 
-            "minimize":loss,
-            "train/train_acc" : acc,
+            "loss": loss,
+            "minimize": loss,
+            "acc" : acc,
         }
-        return loss
+        return result
+
+    def training_epoch_end(self, outputs):
+        train_loss = mean(outputs, 'loss')
+        train_acc = mean(outputs, 'acc')
+        log = {
+            'train/train_loss': train_loss,
+            'train/train_acc': train_acc
+        }
+        self.log_dict(log)
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx != 0:
@@ -285,7 +295,12 @@ class CustomSimCLR(pl.LightningModule):
             'val/val_loss': val_loss,
             'val/val_acc': val_acc
         }
-        return {'val_loss': val_loss, 'log': log, 'progress_bar': log}
+        self.log_dict(log)
+        return {
+            'val_loss': val_loss,
+            'val_acc': val_acc,
+            'log': log, 'progress_bar': log
+        }
 
     def on_train_start(self):
         # log configuration
@@ -385,7 +400,7 @@ def init_logger(config):
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
     if not os.path.isdir(config['log_dir']):
-        os.mkdir(config['log_dir'])
+        os.makedirs(config['log_dir'], exist_ok=True)
     logging.basicConfig(filename=os.path.join(config['log_dir'], 'info.log'), level=level,
                         format='%(asctime)s %(name)s:%(lineno)s %(levelname)s:  %(message)s  ')
     return logging.getLogger(__name__)
@@ -420,14 +435,13 @@ def pretrain_routine(args):
     date = time.asctime()
     label_to_num_classes = {"label_all": 71, "label_diag": 44, "label_form": 19,
                             "label_rhythm": 12, "label_diag_subclass": 23, "label_diag_superclass": 5}
-    ptb_num_classes = label_to_num_classes[config["eval_dataset"]
-                                           ["ptb_xl_label"]]
+    ptb_num_classes = label_to_num_classes[config["eval_dataset"]["ptb_xl_label"]]
     abr = {"Transpose": "Tr", "TimeOut": "TO", "DynamicTimeWarp": "DTW", "RandomResizedCrop": "RRC", "ChannelResize": "ChR", "GaussianNoise": "GN",
            "TimeWarp": "TW", "ToTensor": "TT", "GaussianBlur": "GB", "BaselineWander": "BlW", "PowerlineNoise": "PlN", "EMNoise": "EM", "BaselineShift": "BlS"}
     trs = re.sub(r"[,'\]\[]", "", str([abr[str(tr)] if abr[str(tr)] not in [
                  "TT", "Tr"] else '' for tr in dataset.transformations]))
-    name = str(date) + "_" + method + "_" + str(
-        time.time_ns())[-3:] + "_" + trs[1:]
+    name = str(date) + "_" + method + "_" + str(time.time_ns())[-3:] + "_" + trs[1:]
+    name = name.replace(' ', '_')
     tb_logger = TensorBoardLogger(args.log_dir, name=name, version='')
     config["log_dir"] = os.path.join(args.log_dir, name)
     print(config)
@@ -497,6 +511,9 @@ def cli_main():
             pl_model.load_from_checkpoint(args.checkpoint_path)
         else:
             raise("checkpoint does not exist")
+
+    # set seed
+    seed_everything(seed=0)
 
     # start training
     trainer.fit(pl_model, ecg_datamodule)

@@ -404,7 +404,8 @@ if __name__ == '__main__':
         progress_bar_refresh_rate=0,
         weights_summary='top',
         resume_from_checkpoint= None if hparams.resume=="" else hparams.resume)
-        
+    # set seed
+    pl.utilities.seed.seed_everything(seed=0)
     if(hparams.lr_find):#lr find
         trainer.tune(model)
         

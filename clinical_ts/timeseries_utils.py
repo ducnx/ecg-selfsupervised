@@ -294,7 +294,9 @@ def reformat_as_memmap(df, target_filename, data_folder=None, annotation=False, 
     df_mapped["data_original"]=df_mapped.data
     df_mapped["data"]=np.arange(len(df_mapped))
 
-    df_mapped.to_pickle(target_filename.parent/("df_"+target_filename.stem+".pkl"))
+    df_mapped.to_pickle(
+        target_filename.parent/("df_"+target_filename.stem+".pkl"), protocol=4
+    )
     return df_mapped
 
 # Cell

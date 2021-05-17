@@ -50,7 +50,7 @@ eval_dataset:
   num_workers: 8
   valid_size: 0.05
   data_folder:   "./data/ptbxl"
-  target_folders: ["./data/ptb_xl_fs100"]
+  target_folders: ["/home/dxng/datasets/PTB-XL/ptb_xl_fs100"]
   target_fs: 100
   recreate_data_ptb_xl: False
   ptb_xl_label: "label_all"       #------V------

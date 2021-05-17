@@ -20,6 +20,7 @@ from sklearn.metrics import roc_auc_score
 from clinical_ts.simclr_dataset_wrapper import SimCLRDataSetWrapper
 from clinical_ts.eval_utils_cafa import eval_scores, eval_scores_bootstrap
 from clinical_ts.timeseries_utils import aggregate_predictions
+from pytorch_lightning.utilities.seed import seed_everything
 import pdb
 from copy import deepcopy
 from os.path import join, isdir
@@ -30,7 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Finetuning tests")
     parser.add_argument("--model_file")
     parser.add_argument("--method")
-    parser.add_argument("--dataset", nargs="+", default="./data/ptb_xl_fs100")
+    parser.add_argument("--dataset", default="./data/ptb_xl_fs100")
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--discriminative_lr", default=False, action="store_true")
     parser.add_argument("--num_workers", type=int, default=8)
@@ -137,7 +138,7 @@ def adjust(model, num_classes, hidden=False):
 
 def configure_optimizer(model, batch_size, head_only=False, discriminative_lr=False, base_model="xresnet1d", optimizer="adam", discriminative_lr_factor=1):
     loss_fn = F.binary_cross_entropy_with_logits
-    if base_model == "xresnet1d":
+    if 'xresnet1d' in base_model:
         wd = 1e-1
         if head_only:
             lr = (8e-3*(batch_size/256))
@@ -325,6 +326,7 @@ def set_train_eval(model, cpc, linear_evaluation):
 
 
 def train_model(model, train_loader, valid_loader, test_loader, epochs, loss_fn, optimizer, head_only=True, linear_evaluation=False, percentage=1, lr_schedule=None, save_model_at=None, val_idmap=None, test_idmap=None, lbl_itos=None, cpc=False):
+    seed_everything(seed=0)
     if head_only:
         if linear_evaluation:
             print("linear evaluation for {} epochs".format(epochs))
@@ -462,6 +464,7 @@ def eval_model(model, valid_loader, cpc=False):
 
 
 def get_dataset(batch_size, num_workers, target_folder, apply_noise=False, percentage=1.0, folds=8, t_params=None, test=False, normalize=False):
+
     if apply_noise:
         transformations = ["BaselineWander",
                            "PowerlineNoise", "EMNoise", "BaselineShift"]
@@ -514,8 +517,7 @@ if __name__ == "__main__":
             args.batch_size, args.num_workers, args.dataset, apply_noise=True, t_params=t_params, test=args.test)
     else:
         noise_valid_loader = None
-    losses, macros, predss, result_macros, result_macros_agg, test_macros, test_macros_agg, noised_macros, noised_macros_agg = [
-    ], [], [], [], [], [], [], [], []
+    losses, macros, predss, result_macros, result_macros_agg, test_macros, test_macros_agg, noised_macros, noised_macros_agg = [], [], [], [], [], [], [], [], []
     ckpt_epoch_lin=0
     ckpt_epoch_fin=0
     if args.f_epochs == 0:
@@ -531,9 +533,12 @@ if __name__ == "__main__":
 
     model = load_model(
         args.linear_evaluation, 71, args.use_pretrained or args.load_finetuned, hidden=args.hidden,
-        location=args.model_file, discriminative_lr=args.discriminative_lr, method=args.method)
+        location=args.model_file, discriminative_lr=args.discriminative_lr, method=args.method,
+        base_model=args.base_model
+    )
     loss_fn, optimizer = configure_optimizer(
-        model, args.batch_size, head_only=True, discriminative_lr=args.discriminative_lr, discriminative_lr_factor=0.1 if args.use_pretrained and args.discriminative_lr else 1)
+        model, args.batch_size, head_only=True, discriminative_lr=args.discriminative_lr, discriminative_lr_factor=0.1 if args.use_pretrained and args.discriminative_lr else 1, base_model=args.base_model
+    )
     if not args.eval_only:
         print("train model...")
         if not isdir(save_model_at):
@@ -550,9 +555,13 @@ if __name__ == "__main__":
             if args.l_epochs != 0:
                 model = load_model(
                     False, 71, True, hidden=args.hidden,
-                    location=join(save_model_at, "finetuned.pt"), discriminative_lr=args.discriminative_lr, method=args.method)
+                    location=join(save_model_at, "finetuned.pt"), discriminative_lr=args.discriminative_lr,
+                    method=args.method, base_model=args.base_model
+                )
             loss_fn, optimizer = configure_optimizer(
-                model, args.batch_size, head_only=False, discriminative_lr=args.discriminative_lr, discriminative_lr_factor=0.1 if args.use_pretrained and args.discriminative_lr else 1)
+                model, args.batch_size, head_only=False, discriminative_lr=args.discriminative_lr, discriminative_lr_factor=0.1 if args.use_pretrained and args.discriminative_lr else 1,
+                base_model=args.base_model
+            )
             l2, m2, bm, bm_agg, tm, tm_agg, ckpt_epoch_fin, preds = train_model(model, train_loader, valid_loader, test_loader, args.f_epochs, loss_fn,
                                                                                 optimizer, head_only=False, linear_evaluation=False, lr_schedule=args.lr_schedule, save_model_at=join(save_model_at, "finetuned.pt"),
                                                                                 val_idmap=val_idmap, test_idmap=test_idmap, lbl_itos=lbl_itos, cpc=(args.method == "cpc"))
