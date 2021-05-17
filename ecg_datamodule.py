@@ -70,7 +70,8 @@ class ECGDataModule(LightningDataModule):
 
     def val_dataloader(self):
         dataset = SimCLRDataSetWrapper(
-            self.config['eval_batch_size'], **self.config['eval_dataset'], transformations=self.transformations_str, t_params=self.t_params)
+            self.config['eval_batch_size'], **self.config['dataset'], transformations=self.transformations_str, t_params=self.t_params
+        )
         _, valid_loader_self = dataset.get_data_loaders()
         dataset = SimCLRDataSetWrapper(
             self.config['eval_batch_size'], **self.config['eval_dataset'], transformations=self.transformations_str, t_params=self.t_params, mode="linear_evaluation")
