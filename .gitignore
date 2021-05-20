@@ -4,3 +4,4 @@ __pycache__/
 experiment_logs/
 runs/
 temp/
+*.pyc

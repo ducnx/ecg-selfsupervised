@@ -18,7 +18,7 @@ class ECGDataModule(LightningDataModule):
             self,
             config,
             transformations_str,
-            t_params, 
+            t_params,
             data_dir: str = None,
             val_split: int = 5000,
             num_workers: int = 16,
@@ -48,7 +48,7 @@ class ECGDataModule(LightningDataModule):
     def set_params(self):
         dataset = SimCLRDataSetWrapper(
             self.config['batch_size'], **self.config['dataset'], transformations=self.transformations_str, t_params=self.t_params)
-        train_loader, valid_loader = dataset.get_data_loaders() 
+        train_loader, valid_loader = dataset.get_data_loaders()
         self.num_samples = dataset.train_ds_size
         self.transformations = dataset.transformations
     @property
