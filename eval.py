@@ -115,7 +115,8 @@ def get_new_state_dict(init_state_dict, lightning_state_dict, method="simclr"):
 
 
 def adjust(model, num_classes, hidden=False):
-    in_features = model.l1.in_features
+    in_features = 512
+    # in_features = model.l1.in_features
     last_layer = torch.nn.modules.linear.Linear(
         in_features, num_classes).to(device)
     if hidden:

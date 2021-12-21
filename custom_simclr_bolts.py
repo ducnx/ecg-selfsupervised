@@ -5,7 +5,7 @@ from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import Adam
 import torch
 import re
-import pdb 
+import pdb
 
 import math
 from argparse import ArgumentParser
@@ -41,26 +41,30 @@ from ecg_datamodule import ECGDataModule
 from pytorch_lightning.loggers import TensorBoardLogger
 from pl_bolts.models.self_supervised.evaluator import Flatten
 import pdb
-method="simclr"
+method = "simclr"
 logger = create_logger(__name__)
+
+
 def _accuracy(zis, zjs, batch_size):
     with torch.no_grad():
         representations = torch.cat([zjs, zis], dim=0)
         similarity_matrix = torch.mm(
             representations, representations.t().contiguous())
         corrected_similarity_matrix = similarity_matrix - \
-            torch.eye(2*batch_size).type_as(similarity_matrix)
+            torch.eye(2 * batch_size).type_as(similarity_matrix)
         pred_similarities, pred_indices = torch.max(
             corrected_similarity_matrix[:batch_size], dim=1)
-        correct_indices = torch.arange(batch_size)+batch_size
+        correct_indices = torch.arange(batch_size) + batch_size
         correct_preds = (
             pred_indices == correct_indices.type_as(pred_indices)).sum()
-    return correct_preds.float()/batch_size
+    return correct_preds.float() / batch_size
+
 
 def mean(res, key1, key2=None):
     if key2 is not None:
         return torch.stack([x[key1][key2] for x in res]).mean()
     return torch.stack([x[key1] for x in res if type(x) == dict and key1 in x.keys()]).mean()
+
 
 class Projection(nn.Module):
     def __init__(self, input_dim=2048, hidden_dim=2048, output_dim=128):
@@ -144,10 +148,9 @@ class CustomSimCLR(pl.LightningModule):
             weight_decay=self.hparams.opt_weight_decay
         )
 
-
         # optimizer = LARSWrapper(Adam(parameters, lr=self.hparams.lr))
         optimizer = Adam(parameters, lr=self.hparams.lr)
-        
+
         # Trick 2 (after each step)
         self.hparams.warmup_epochs = self.hparams.warmup_epochs * self.train_iters_per_epoch
         max_epochs = self.trainer.max_epochs * self.train_iters_per_epoch
@@ -184,7 +187,7 @@ class CustomSimCLR(pl.LightningModule):
             {'params': params, 'weight_decay': weight_decay},
             {'params': excluded_params, 'weight_decay': 0.}
         ]
-    
+
     def shared_forward(self, batch, batch_idx):
         (x1, y1), (x2, y2) = batch
         # ENCODE
@@ -225,7 +228,7 @@ class CustomSimCLR(pl.LightningModule):
         else:
             out_1_dist = out_1
             out_2_dist = out_2
-        
+
         # out: [2 * batch_size, dim]
         # out_dist: [2 * batch_size * world_size, dim]
         out = torch.cat([out_1, out_2], dim=0)
@@ -260,7 +263,7 @@ class CustomSimCLR(pl.LightningModule):
         result = {
             "loss": loss,
             "minimize": loss,
-            "acc" : acc,
+            "acc": acc,
         }
         return result
 
@@ -323,7 +326,7 @@ class CustomSimCLR(pl.LightningModule):
 
     def get_representations(self, x):
         return self.encoder(x)[0]
-    
+
     def get_model(self):
         return self.encoder
 
@@ -340,55 +343,58 @@ def parse_args(parent_parser):
                         default=["GaussianNoise", "ChannelResize", "RandomResizedCrop"])
     # GaussianNoise
     parser.add_argument(
-            '--gaussian_scale', help='std param for gaussian noise transformation', default=0.005, type=float)
+        '--gaussian_scale', help='std param for gaussian noise transformation', default=0.005, type=float)
     # RandomResizedCrop
     parser.add_argument('--rr_crop_ratio_range',
-                            help='ratio range for random resized crop transformation', default=[0.5, 1.0], type=float)
+                        help='ratio range for random resized crop transformation', default=[0.5, 1.0], type=float)
     parser.add_argument(
-            '--output_size', help='output size for random resized crop transformation', default=250, type=int)
+        '--output_size', help='output size for random resized crop transformation', default=250, type=int)
     # DynamicTimeWarp
     parser.add_argument(
-            '--warps', help='number of warps for dynamic time warp transformation', default=3, type=int)
+        '--warps', help='number of warps for dynamic time warp transformation', default=3, type=int)
     parser.add_argument(
-            '--radius', help='radius of warps of dynamic time warp transformation', default=10, type=int)
+        '--radius', help='radius of warps of dynamic time warp transformation', default=10, type=int)
     # TimeWarp
     parser.add_argument(
-            '--epsilon', help='epsilon param for time warp', default=10, type=float)
+        '--epsilon', help='epsilon param for time warp', default=10, type=float)
     # ChannelResize
     parser.add_argument('--magnitude_range', nargs='+',
-                            help='range for scale param for ChannelResize transformation', default=[0.5, 2], type=float)
+                        help='range for scale param for ChannelResize transformation', default=[0.5, 2], type=float)
     # Downsample
     parser.add_argument(
-            '--downsample_ratio', help='downsample ratio for Downsample transformation', default=0.2, type=float)
+        '--downsample_ratio', help='downsample ratio for Downsample transformation', default=0.2, type=float)
     # TimeOut
     parser.add_argument('--to_crop_ratio_range', nargs='+',
-                            help='ratio range for timeout transformation', default=[0.2, 0.4], type=float)
+                        help='ratio range for timeout transformation', default=[0.2, 0.4], type=float)
     # resume training
     parser.add_argument('--resume', action='store_true')
     parser.add_argument(
-            '--gpus', help='number of gpus to use; use cpu if gpu=0', type=int, default=1)
+        '--gpus', help='number of gpus to use; use cpu if gpu=0', type=int, default=1)
     parser.add_argument(
-            '--num_nodes', default=1, help='number of cluster nodes', type=int)
+        '--num_nodes', default=1, help='number of cluster nodes', type=int)
     parser.add_argument(
-            '--distributed_backend', help='sets backend type')
+        '--distributed_backend', help='sets backend type')
     parser.add_argument('--batch_size', type=int)
     parser.add_argument('--epochs', type=int)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--warm_up', default=1, type=int, help="number of warm up epochs")
     parser.add_argument('--precision', type=int)
     parser.add_argument('--datasets', dest="target_folders",
-                            nargs='+', help='used datasets for pretraining')
+                        nargs='+', help='used datasets for pretraining')
     parser.add_argument('--log_dir', default="./experiment_logs")
     parser.add_argument(
-            '--percentage', help='determines how much of the dataset shall be used during the pretraining', type=float, default=1.0)
+        '--percentage', help='determines how much of the dataset shall be used during the pretraining', type=float, default=1.0)
     parser.add_argument('--lr', type=float, help="learning rate")
     parser.add_argument('--out_dim', type=int, help="output dimension of model")
-    parser.add_argument('--filter_cinc', default=False, action="store_true", help="only valid if cinc is selected: filter out the ptb data")
+    parser.add_argument('--filter_cinc', default=False, action="store_true",
+                        help="only valid if cinc is selected: filter out the ptb data")
     parser.add_argument('--base_model')
-    parser.add_argument('--widen',type=int, help="use wide xresnet1d50")
-    parser.add_argument('--run_callbacks', default=False, action="store_true", help="run callbacks which asses linear evaluaton and finetuning metrics during pretraining")
+    parser.add_argument('--widen', type=int, help="use wide xresnet1d50")
+    parser.add_argument('--run_callbacks', default=False, action="store_true",
+                        help="run callbacks which asses linear evaluaton and finetuning metrics during pretraining")
     parser.add_argument('--checkpoint_path', default="")
     return parser
+
 
 def init_logger(config):
     level = logging.INFO
@@ -405,10 +411,11 @@ def init_logger(config):
                         format='%(asctime)s %(name)s:%(lineno)s %(levelname)s:  %(message)s  ')
     return logging.getLogger(__name__)
 
+
 def pretrain_routine(args):
     t_params = {"gaussian_scale": args.gaussian_scale, "rr_crop_ratio_range": args.rr_crop_ratio_range, "output_size": args.output_size, "warps": args.warps, "radius": args.radius,
                 "epsilon": args.epsilon, "magnitude_range": args.magnitude_range, "downsample_ratio": args.downsample_ratio, "to_crop_ratio_range": args.to_crop_ratio_range,
-                "bw_cmax":0.1, "em_cmax":0.5, "pl_cmax":0.2, "bs_cmax":1}
+                "bw_cmax": 0.1, "em_cmax": 0.5, "pl_cmax": 0.2, "bs_cmax": 1}
     transformations = args.trafos
     checkpoint_config = os.path.join("checkpoints", "bolts_config.yaml")
     config_file = checkpoint_config if args.resume and os.path.isfile(
@@ -447,6 +454,7 @@ def pretrain_routine(args):
     print(config)
     return config, dataset, date, transformations, t_params, ptb_num_classes, tb_logger
 
+
 def aftertrain_routine(config, args, trainer, pl_model, datamodule, callbacks):
     scores = {}
     for ca in callbacks:
@@ -462,13 +470,14 @@ def aftertrain_routine(config, args, trainer, pl_model, datamodule, callbacks):
     with open(os.path.join(config["log_dir"], "config.txt"), "w") as text_file:
         print(config, file=text_file)
 
+
 def cli_main():
     from pytorch_lightning import Trainer
     from online_evaluator import SSLOnlineEvaluator
     from ecg_datamodule import ECGDataModule
     from clinical_ts.create_logger import create_logger
     from os.path import exists
-    
+
     parser = ArgumentParser()
     parser = parse_args(parser)
     logger.info("parse arguments")
@@ -480,13 +489,13 @@ def cli_main():
 
     callbacks = []
     if args.run_callbacks:
-            # callback for online linear evaluation/fine-tuning
+        # callback for online linear evaluation/fine-tuning
         linear_evaluator = SSLOnlineEvaluator(drop_p=0,
-                                          z_dim=512, num_classes=ptb_num_classes, hidden_dim=None, lin_eval_epochs=config["eval_epochs"], eval_every=config["eval_every"], mode="linear_evaluation", verbose=False)
+                                              z_dim=512, num_classes=ptb_num_classes, hidden_dim=None, lin_eval_epochs=config["eval_epochs"], eval_every=config["eval_every"], mode="linear_evaluation", verbose=False)
 
         fine_tuner = SSLOnlineEvaluator(drop_p=0,
-                                          z_dim=512, num_classes=ptb_num_classes, hidden_dim=None, lin_eval_epochs=config["eval_epochs"], eval_every=config["eval_every"], mode="fine_tuning", verbose=False)
-   
+                                        z_dim=512, num_classes=ptb_num_classes, hidden_dim=None, lin_eval_epochs=config["eval_epochs"], eval_every=config["eval_every"], mode="fine_tuning", verbose=False)
+
         callbacks.append(linear_evaluator)
         callbacks.append(fine_tuner)
 
@@ -497,12 +506,12 @@ def cli_main():
     # pytorch lightning module
     model = ResNetSimCLR(**config["model"])
     pl_model = CustomSimCLR(
-            config["batch_size"], ecg_datamodule.num_samples, warmup_epochs=config["warm_up"], lr=config["lr"],
-            out_dim=config["model"]["out_dim"], config=config,
-            transformations=ecg_datamodule.transformations, loss_temperature=config["loss"]["temperature"], weight_decay=eval(config["weight_decay"]))
+        config["batch_size"], ecg_datamodule.num_samples, warmup_epochs=config["warm_up"], lr=config["lr"],
+        out_dim=config["model"]["out_dim"], config=config,
+        transformations=ecg_datamodule.transformations, loss_temperature=config["loss"]["temperature"], weight_decay=eval(config["weight_decay"]))
     pl_model.encoder = model
     pl_model.projection = Projection(
-            input_dim=model.l1.in_features, hidden_dim=512, output_dim=config["model"]["out_dim"])
+        input_dim=model.l1.in_features, hidden_dim=512, output_dim=config["model"]["out_dim"])
 
     # load checkpoint
     if args.checkpoint_path != "":
@@ -520,5 +529,6 @@ def cli_main():
 
     aftertrain_routine(config, args, trainer, pl_model, ecg_datamodule, callbacks)
 
-if __name__ == "__main__":  
+
+if __name__ == "__main__":
     cli_main()

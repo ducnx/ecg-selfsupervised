@@ -71,7 +71,7 @@ def transformations_from_strings(transformations, t_params):
 class SimCLRDataSetWrapper(object):
 
     def __init__(self, batch_size, num_workers, valid_size, input_shape, s, data_folder, target_folders, target_fs, recreate_data_ptb_xl,
-                 mode="pretraining", transformations=None, t_params=None, ptb_xl_label="label_diag_superclass", filter_cinc=False, 
+                 mode="pretraining", transformations=None, t_params=None, ptb_xl_label="label_diag_superclass", filter_cinc=False,
                  percentage=1.0, swav=False, nmb_crops=7, folds=8, test=False):
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -117,7 +117,7 @@ class SimCLRDataSetWrapper(object):
                 self.target_folders[0], transforms=data_augment)
             self.val_ds_idmap = val_ds.get_id_mapping()
         else:
-            
+
             wrapper_transform = SwAVDataTransform(data_augment, num_crops=self.nmb_crops) if self.swav else SimCLRDataTransform(data_augment)
             datasets = [self._get_datasets(target_folder, transforms=wrapper_transform) for target_folder in self.target_folders]
             train_datasets, valid_datasets = list(zip(*datasets))
@@ -154,7 +154,7 @@ class SimCLRDataSetWrapper(object):
         else:
             valid_fold=9
             test_fold=10
-       
+
         train_folds = []
         train_folds = list(range(1, 11))
         train_folds.remove(test_fold)
@@ -167,8 +167,8 @@ class SimCLRDataSetWrapper(object):
         # df, lbl_itos,  mean, std = prepare_data_ptb_xl(self.data_folder, min_cnt=50, target_fs=self.target_fs,
         #                                                                        channels=input_channels, channel_stoi=channel_stoi_default, target_folder=self.target_folder, recreate_data=self.recreate_data_ptb_xl)
         df_mapped, lbl_itos, mean, std = load_dataset(target_folder)
-        
-       
+
+
         if(self.recreate_data_ptb_xl):
             df_mapped = reformat_as_memmap(
                 df, target_folder/(memmap_filename), data_folder=target_folder)
@@ -177,11 +177,11 @@ class SimCLRDataSetWrapper(object):
             #     target_folder/(df_memmap_filename))
             df_mapped = pickle.load(open(target_folder/(df_memmap_filename), "rb"))
         #self.lbl_itos = np.array(lbl_itos[label])
-        
+
         self.lbl_itos = lbl_itos
         self.num_classes = len(lbl_itos)
         # print("num classes:", self.num_classes)
-        
+
         if "ptb" in str(target_folder):
             label = self.ptb_xl_label  # just possible for ptb xl
             self.lbl_itos = np.array(lbl_itos[label])
@@ -203,7 +203,7 @@ class SimCLRDataSetWrapper(object):
         # logger.info("labels: " + str(self.lbl_itos))
         # df_mapped["label"] = df_mapped["label"].apply(lambda x: onehot_encode(x, len(self.lbl_itos)))
 
-       
+
         if self.mode == "pretraining":
             valid_fold = test_fold = 9
             if self.percentage < 1.0:
@@ -212,13 +212,13 @@ class SimCLRDataSetWrapper(object):
                 num_samples = int(self.percentage*total_samples)
                 sample_indices = np.sort(np.random.choice(np.arange(total_samples), size=num_samples, replace=False))
                 df_mapped = df_mapped.loc[sample_indices]
-        
+
             df_train = df_mapped[(df_mapped.strat_fold != test_fold) & (
                 df_mapped.strat_fold != valid_fold) & (df_mapped.label.apply(lambda x: np.sum(x) > 0))]
         else:
             assert(self.folds < 9)
             df_train = df_mapped[(df_mapped.strat_fold.apply(lambda x: x in train_folds[range(self.folds)]) & (df_mapped.label.apply(lambda x: np.sum(x) > 0)))]
-        
+
         df_valid = df_mapped[(df_mapped.strat_fold == valid_fold) & (
             df_mapped.label.apply(lambda x: np.sum(x) > 0))]
         df_test = df_mapped[(df_mapped.strat_fold == test_fold) & (
@@ -234,7 +234,7 @@ class SimCLRDataSetWrapper(object):
         val_ds = TimeseriesDatasetCrops(df_valid, input_size, num_classes=len(self.lbl_itos), data_folder=target_folder, chunk_length=chunk_length_valid if chunkify_valid else 0,
                                         min_chunk_length=min_chunk_length, stride=stride_length_valid, transforms=transforms, annotation=False, col_lbl="label", memmap_filename=target_folder/(memmap_filename))
         self.df_train = df_train
-        self.df_valid = df_valid 
+        self.df_valid = df_valid
         self.df_test = df_test
         return train_ds, val_ds
 
@@ -277,7 +277,7 @@ class SwAVDataTransform(object):
         self.num_crops=num_crops
 
     def __call__(self, sample):
-        transformed = [] 
+        transformed = []
         for _ in range(self.num_crops):
             transformed.append(self.transform(sample)[0])
         return transformed, sample[1]

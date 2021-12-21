@@ -1,0 +1,8 @@
+*.pyc
+experiment_logs/
+.vscode/
+__pycache__
+.ipynb_checkpoints/
+runs/
+temp/
+.git/
